@@ -28,10 +28,7 @@ def extract_strings(filepath, limit=100):
             data = f.read()
             matches = re.findall(rb"[ -~]{6,}", data)
             for m in matches[:limit]:
-                try:
-                    results.append(m.decode(errors="ignore"))
-                except:
-                    pass
+                results.append(m.decode(errors="ignore"))
     except Exception as e:
         results.append(f"Erro ao extrair strings: {e}")
     return results
@@ -57,64 +54,59 @@ def scan_file(filepath):
     if not os.path.exists(filepath):
         raise FileNotFoundError("Arquivo não encontrado")
 
-    file_size = os.path.getsize(filepath)
-    sha256 = calculate_sha256(filepath)
-    strings = extract_strings(filepath)
-    suspicious = find_suspicious(strings)
-    structure = analyze_structure(filepath)
-
     result = {
-        "file": os.path.basename(filepath),
-        "path": os.path.abspath(filepath),
-        "size_bytes": file_size,
-        "sha256": sha256,
+        "file_name": os.path.basename(filepath),
+        "full_path": os.path.abspath(filepath),
+        "size_bytes": os.path.getsize(filepath),
+        "sha256": calculate_sha256(filepath),
         "is_apk_or_zip": zipfile.is_zipfile(filepath),
-        "suspicious_strings": suspicious[:30],
-        "structure_preview": structure,
+        "structure_preview": analyze_structure(filepath),
+        "suspicious_strings": [],
         "scan_time": datetime.utcnow().isoformat() + "Z"
     }
+
+    strings = extract_strings(filepath)
+    result["suspicious_strings"] = find_suspicious(strings)[:30]
 
     return result
 
 def main():
     parser = argparse.ArgumentParser(
-        description="App Scanner - Scan de APK e arquivos suspeitos"
+        description="AppScanner - Scan de APK e arquivos"
     )
     parser.add_argument(
         "-f", "--file",
         required=True,
-        help="Caminho do arquivo (APK ou app)"
+        help="Caminho do arquivo para escanear"
     )
     parser.add_argument(
         "-o", "--output",
-        help="Salvar resultado em JSON (ex: resultado.json)"
+        help="Salvar resultado em JSON"
     )
     parser.add_argument(
         "--pretty",
         action="store_true",
-        help="Saída JSON formatada"
+        help="JSON formatado"
     )
 
     args = parser.parse_args()
 
     try:
-        result = scan_file(args.file)
+        data = scan_file(args.file)
 
         if args.pretty:
-            output_data = json.dumps(result, indent=4, ensure_ascii=False)
+            output = json.dumps(data, indent=4, ensure_ascii=False)
         else:
-            output_data = json.dumps(result, ensure_ascii=False)
+            output = json.dumps(data, ensure_ascii=False)
 
-        print(output_data)
+        print(output)
 
         if args.output:
             with open(args.output, "w", encoding="utf-8") as f:
-                f.write(output_data)
+                f.write(output)
 
     except Exception as e:
-        error = {"error": str(e)}
-        print(json.dumps(error, indent=4))
-        exit(1)
+        print(json.dumps({"error": str(e)}, indent=4))
 
 if __name__ == "__main__":
     main()
